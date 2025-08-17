@@ -27,20 +27,29 @@ git clone https://github.com/zilhak/ImagePathifier.git
 cd ImagePathifier
 ```
 
-2. Install dependencies:
+2. Set up virtual environment (Recommended):
 ```bash
+# Windows - PowerShell
+.\setup_venv.ps1
+
+# Windows - CMD
+setup_venv.bat
+
+# Or manually
+py -m venv venv
+.\venv\Scripts\activate  # Windows
+source venv/bin/activate  # Linux/Mac
 pip install -r requirements.txt
 ```
 
 3. Run the application:
 ```bash
+# With venv (Recommended)
+.\run_with_venv.ps1  # PowerShell
+run_with_venv.bat    # CMD
+
+# Or directly
 python ImagePathifier.py
-```
-
-또는
-
-```bash
-py ImagePathifier.py  # Windows
 ```
 
 ## Usage
@@ -91,7 +100,6 @@ ImagePathifier/
 │       ├── __init__.py
 │       └── clipboard.py     # Clipboard utilities
 ├── ImagePathifier.py        # Main run script
-├── run.py                   # Alternative run script
 ├── requirements.txt         # Dependencies
 ├── settings.json            # User settings (auto-generated)
 └── README.md
