@@ -105,8 +105,12 @@ class MainWindow:
             row = idx // columns
             col = idx % columns
             
-            # 썸네일 프레임 생성
-            thumb_frame = ctk.CTkFrame(self.grid_frame)
+            # 썸네일 프레임 생성 (첫 번째 이미지는 강조)
+            thumb_frame = ctk.CTkFrame(
+                self.grid_frame,
+                border_width=2 if idx == 0 else 0,
+                border_color="green" if idx == 0 else None
+            )
             thumb_frame.grid(row=row, column=col, padx=5, pady=5, sticky="nsew")
             
             try:
@@ -130,11 +134,13 @@ class MainWindow:
                     lambda e, path=img_path: self._on_thumbnail_click(path)
                 )
                 
-                # 파일명 레이블 추가
+                # 파일명 레이블 추가 (최신 이미지는 표시)
+                label_text = f"[최신] {img_path.name}" if idx == 0 else img_path.name
                 name_label = ctk.CTkLabel(
                     thumb_frame, 
-                    text=img_path.name, 
-                    font=ctk.CTkFont(size=10)
+                    text=label_text, 
+                    font=ctk.CTkFont(size=10, weight="bold" if idx == 0 else "normal"),
+                    text_color="green" if idx == 0 else None
                 )
                 name_label.pack()
                 
@@ -153,7 +159,19 @@ class MainWindow:
     
     def update_status(self, message: str):
         """상태 메시지 업데이트"""
-        self.status_label.configure(text=message)
+        self.status_label.configure(text=message, text_color=("gray10", "gray90"))
+    
+    def update_status_error(self, message: str, duration: int = 3000):
+        """에러 상태 메시지 업데이트 (빨간색)
+        
+        Args:
+            message: 표시할 메시지
+            duration: 메시지 표시 시간 (밀리초, 기본 3초)
+        """
+        self.status_label.configure(text=message, text_color="red")
+        
+        # 일정 시간 후 원래 상태로 복구
+        self.root.after(duration, lambda: self.update_status("준비됨"))
     
     def show_error(self, title: str, message: str):
         """에러 메시지 표시"""

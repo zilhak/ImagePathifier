@@ -99,11 +99,8 @@ class ImagePathifierApp:
                         "이미지를 저장할 수 없습니다."
                     )
             else:
-                self.main_window.update_status("클립보드에 이미지가 없습니다")
-                self.main_window.show_warning(
-                    "이미지 없음", 
-                    "클립보드에서 이미지를 찾을 수 없습니다."
-                )
+                # 팝업 대신 빨간색 상태 메시지만 표시
+                self.main_window.update_status_error("클립보드에 이미지가 없습니다")
                 
         except Exception as e:
             self.main_window.update_status(f"오류: {e}")

@@ -82,16 +82,28 @@ class ImageManager:
     def cleanup_old_images(self) -> None:
         """max_images 제한을 초과하는 이미지 제거"""
         while len(self.image_files) > self.max_images:
-            # 가장 오래된 것(목록의 첫 번째) 제거
-            old_file = self.image_files.pop(0)
-            try:
-                if old_file.exists():
-                    old_file.unlink()
-            except OSError as e:
-                print(f"파일 삭제 오류: {e}")
+            # 번호가 가장 작은 (가장 오래된) 이미지 찾기
+            def get_image_number(path: Path) -> int:
+                try:
+                    if path.stem.startswith('img_'):
+                        return int(path.stem.split('_')[1])
+                except (ValueError, IndexError):
+                    pass
+                return 0
+            
+            # 가장 작은 번호를 가진 이미지 찾기
+            if self.image_files:
+                oldest_file = min(self.image_files, key=get_image_number)
+                self.image_files.remove(oldest_file)
+                
+                try:
+                    if oldest_file.exists():
+                        oldest_file.unlink()
+                except OSError as e:
+                    print(f"파일 삭제 오류: {e}")
     
     def get_sorted_images(self) -> List[Path]:
-        """번호순으로 정렬된 이미지 목록 반환"""
+        """번호순으로 정렬된 이미지 목록 반환 (최신 이미지가 먼저)"""
         def get_image_number(path: Path) -> int:
             try:
                 if path.stem.startswith('img_'):
@@ -100,7 +112,8 @@ class ImageManager:
                 pass
             return 0
         
-        self.image_files.sort(key=get_image_number)
+        # 번호가 큰 것(최신)이 앞에 오도록 역순 정렬
+        self.image_files.sort(key=get_image_number, reverse=True)
         return self.image_files
     
     def update_settings(self, save_directory: str = None, max_images: int = None) -> None:
