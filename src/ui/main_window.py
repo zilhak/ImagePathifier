@@ -58,23 +58,44 @@ class MainWindow:
     
     def _create_instructions(self):
         """안내 텍스트 생성"""
-        instruction_frame = ctk.CTkFrame(self.root)
-        instruction_frame.pack(fill="x", padx=10, pady=(0, 10))
+        # 메인 컨테이너 (배경 통일)
+        instruction_container = ctk.CTkFrame(self.root, fg_color="transparent")
+        instruction_container.pack(fill="x", padx=10, pady=(0, 10))
         
-        instruction_label = ctk.CTkLabel(
-            instruction_frame,
-            text="Ctrl+V를 눌러 클립보드의 이미지를 붙여넣기 → 경로가 자동으로 복사됩니다",
-            font=ctk.CTkFont(size=12)
+        # 버튼과 텍스트를 담을 프레임
+        button_frame = ctk.CTkFrame(instruction_container, fg_color="transparent")
+        button_frame.pack(fill="x", pady=(5, 10))
+        
+        # 붙여넣기 버튼 (중앙 정렬, 더 크고 눈에 띄게)
+        paste_button = ctk.CTkButton(
+            button_frame,
+            text="📋 클립보드에서 붙여넣기",
+            width=200,
+            height=40,
+            command=self._on_paste,
+            font=ctk.CTkFont(size=14, weight="bold"),
+            fg_color=("#3B8ED0", "#1F6AA5"),
+            hover_color=("#36719F", "#144870")
         )
-        instruction_label.pack(pady=5)
+        paste_button.pack()
+        
+        # 안내 텍스트 (버튼 아래)
+        instruction_label = ctk.CTkLabel(
+            instruction_container,
+            text="단축키: Cmd+V 또는 Ctrl+V",
+            font=ctk.CTkFont(size=11),
+            text_color=("gray50", "gray60")
+        )
+        instruction_label.pack(pady=(0, 5))
         
         # 상태 레이블
         self.status_label = ctk.CTkLabel(
-            instruction_frame,
+            instruction_container,
             text="준비됨",
-            font=ctk.CTkFont(size=10)
+            font=ctk.CTkFont(size=10),
+            text_color=("gray30", "gray70")
         )
-        self.status_label.pack(pady=(0, 5))
+        self.status_label.pack()
     
     def _create_thumbnail_grid(self):
         """썸네일 그리드 생성"""
@@ -87,7 +108,20 @@ class MainWindow:
     
     def bind_shortcuts(self):
         """키보드 단축키 바인딩"""
+        import platform
+        
+        # 모든 플랫폼에서 Ctrl+V 지원
         self.root.bind('<Control-v>', lambda e: self._on_paste())
+        self.root.bind('<Control-V>', lambda e: self._on_paste())
+        
+        # macOS에서만 Cmd+V 추가 지원
+        if platform.system() == 'Darwin':
+            try:
+                self.root.bind('<Command-v>', lambda e: self._on_paste())
+                self.root.bind('<Command-V>', lambda e: self._on_paste())
+            except:
+                # Command 키 바인딩 실패 시 무시
+                pass
     
     def update_thumbnail_grid(self, image_files: list, thumbnail_size: int = 100):
         """썸네일 그리드 업데이트"""

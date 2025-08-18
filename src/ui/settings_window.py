@@ -19,8 +19,6 @@ class SettingsWindow:
         self.window = ctk.CTkToplevel(parent_window)
         self.window.title("설정")
         self.window.geometry("500x350")
-        self.window.transient(parent_window)
-        self.window.grab_set()
         
         # 윈도우 중앙 배치
         self.window.update_idletasks()
@@ -28,8 +26,21 @@ class SettingsWindow:
         y = (self.window.winfo_screenheight() // 2) - (350 // 2)
         self.window.geometry(f"+{x}+{y}")
         
+        # UI 설정
         self.setup_ui()
-        self.window.focus()
+        
+        # 윈도우를 최상위로 가져오고 포커스 설정
+        self.window.lift()
+        self.window.attributes('-topmost', True)
+        self.window.after(100, lambda: self.window.attributes('-topmost', False))
+        
+        # transient와 grab_set은 UI 설정 후에
+        self.window.transient(parent_window)
+        self.window.grab_set()
+        self.window.focus_force()
+        
+        # 윈도우가 닫힐 때 이벤트
+        self.window.protocol("WM_DELETE_WINDOW", self.on_cancel)
     
     def setup_ui(self):
         """설정 UI 구성"""
@@ -143,7 +154,7 @@ class SettingsWindow:
         save_btn = ctk.CTkButton(button_frame, text="저장", command=self.save_settings)
         save_btn.pack(side="right", padx=(10, 0))
         
-        cancel_btn = ctk.CTkButton(button_frame, text="취소", command=self.window.destroy)
+        cancel_btn = ctk.CTkButton(button_frame, text="취소", command=self.on_cancel)
         cancel_btn.pack(side="right")
     
     def browse_directory(self):
@@ -168,8 +179,16 @@ class SettingsWindow:
         self.settings['theme'] = self.theme_var.get()
         self.settings['thumbnail_size'] = int(self.thumb_slider.get())
         
-        # 콜백 호출
+        # 창을 먼저 닫고
+        self.window.destroy()
+        
+        # 그 다음 콜백 호출
         if self.on_save_callback:
             self.on_save_callback(self.settings)
-        
+    
+    def on_cancel(self):
+        """취소 버튼 또는 창 닫기"""
         self.window.destroy()
+        # 콜백에 None 전달하여 취소를 알림
+        if self.on_save_callback:
+            self.on_save_callback(None)
