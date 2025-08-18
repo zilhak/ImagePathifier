@@ -37,6 +37,9 @@ class ImagePathifierApp:
         # 클립보드 관리자 초기화
         self.clipboard_manager = ClipboardManager()
         
+        # 설정창 참조
+        self.settings_window = None
+        
         # 윈도우 설정
         self.root = ctk.CTk()
         self.root.title("Image Pathifier")
@@ -119,11 +122,28 @@ class ImagePathifierApp:
     
     def open_settings(self):
         """설정 윈도우 열기"""
-        SettingsWindow(
+        # 이미 설정창이 열려있으면 포커스만 이동
+        if self.settings_window and hasattr(self.settings_window, 'window'):
+            try:
+                self.settings_window.window.lift()
+                self.settings_window.window.focus_force()
+                return
+            except:
+                # 창이 닫혔으면 새로 생성
+                self.settings_window = None
+        
+        # 새 설정창 생성
+        self.settings_window = SettingsWindow(
             self.root,
             self.config_manager.settings,
-            self.apply_settings
+            self.on_settings_closed
         )
+    
+    def on_settings_closed(self, new_settings=None):
+        """설정창이 닫힐 때 호출"""
+        if new_settings:
+            self.apply_settings(new_settings)
+        self.settings_window = None
     
     def apply_settings(self, new_settings: dict):
         """새 설정 적용"""
