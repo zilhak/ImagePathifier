@@ -50,10 +50,10 @@ class ImagePathifierApp:
         
         # 윈도우 크기 설정
         self.root.geometry("800x600")
-        self.root.minsize(600, 400)
+        self.root.minsize(300, 200)
         
         # 윈도우 중앙 배치
-        self.center_window(800, 600)
+        self.center_window(400, 300)
         
         # 메인 윈도우 UI 초기화
         self.main_window = MainWindow(self.root)
