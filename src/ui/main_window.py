@@ -19,92 +19,95 @@ class MainWindow:
         self.on_paste_callback: Optional[Callable] = None
         self.on_settings_callback: Optional[Callable] = None
         self.on_copy_path_callback: Optional[Callable] = None
+        self.current_images = []  # 현재 이미지 목록 저장
+        self.current_thumbnail_size = 100  # 현재 썸네일 크기 저장
+        self.current_columns = 0  # 현재 컬럼 수 저장
+        self.last_width = 0  # 마지막 창 너비 저장
         
         self.setup_ui()
         self.bind_shortcuts()
+        self.bind_resize_event()
     
     def setup_ui(self):
         """UI 구성"""
-        # 메뉴 바 프레임
-        self._create_menu_bar()
-        
-        # 안내 프레임
-        self._create_instructions()
+        # 상단 컨트롤 패널
+        self._create_control_panel()
         
         # 썸네일 그리드
         self._create_thumbnail_grid()
     
-    def _create_menu_bar(self):
-        """메뉴 바 생성"""
-        menu_frame = ctk.CTkFrame(self.root, height=40)
-        menu_frame.pack(fill="x", padx=5, pady=5)
+    def _create_control_panel(self):
+        """상단 컨트롤 패널 생성"""
+        # 메인 컨테이너 (배경색 통일)
+        control_frame = ctk.CTkFrame(self.root, fg_color="transparent", height=60)
+        control_frame.pack(fill="x", padx=10, pady=(5, 10))
+        control_frame.pack_propagate(False)
         
-        # 타이틀
-        title_label = ctk.CTkLabel(
-            menu_frame, 
-            text="Image Pathifier", 
-            font=ctk.CTkFont(size=20, weight="bold")
-        )
-        title_label.pack(side="left", padx=10)
+        # 왼쪽 영역 (붙여넣기 버튼과 단축키)
+        left_frame = ctk.CTkFrame(control_frame, fg_color="transparent")
+        left_frame.pack(side="left", padx=(10, 0))
         
-        # 설정 버튼
-        settings_btn = ctk.CTkButton(
-            menu_frame,
-            text="⚙ 설정",
-            width=100,
-            command=self._on_settings_click
-        )
-        settings_btn.pack(side="right", padx=10)
-    
-    def _create_instructions(self):
-        """안내 텍스트 생성"""
-        # 메인 컨테이너 (배경 통일)
-        instruction_container = ctk.CTkFrame(self.root, fg_color="transparent")
-        instruction_container.pack(fill="x", padx=10, pady=(0, 10))
-        
-        # 버튼과 텍스트를 담을 프레임
-        button_frame = ctk.CTkFrame(instruction_container, fg_color="transparent")
-        button_frame.pack(fill="x", pady=(5, 10))
-        
-        # 붙여넣기 버튼 (중앙 정렬, 더 크고 눈에 띄게)
+        # 붙여넣기 버튼 (작게)
         paste_button = ctk.CTkButton(
-            button_frame,
-            text="📋 클립보드에서 붙여넣기",
-            width=200,
-            height=40,
+            left_frame,
+            text="📋 붙여넣기",
+            width=100,
+            height=28,
             command=self._on_paste,
-            font=ctk.CTkFont(size=14, weight="bold"),
-            fg_color=("#3B8ED0", "#1F6AA5"),
-            hover_color=("#36719F", "#144870")
+            font=ctk.CTkFont(size=12)
         )
-        paste_button.pack()
+        paste_button.pack(pady=(0, 2))
         
-        # 안내 텍스트 (버튼 아래)
-        instruction_label = ctk.CTkLabel(
-            instruction_container,
-            text="단축키: Cmd+V 또는 Ctrl+V",
-            font=ctk.CTkFont(size=11),
+        # 단축키 안내 (버튼 아래)
+        import platform
+        shortcut_text = "Cmd+V" if platform.system() == 'Darwin' else "Ctrl+V"
+        shortcut_label = ctk.CTkLabel(
+            left_frame,
+            text=shortcut_text,
+            font=ctk.CTkFont(size=10),
             text_color=("gray50", "gray60")
         )
-        instruction_label.pack(pady=(0, 5))
+        shortcut_label.pack()
         
-        # 상태 레이블
+        # 오른쪽 영역 (설정 버튼과 카운터)
+        right_frame = ctk.CTkFrame(control_frame, fg_color="transparent")
+        right_frame.pack(side="right", padx=(0, 10))
+        
+        # 설정 버튼 (작게)
+        settings_btn = ctk.CTkButton(
+            right_frame,
+            text="⚙ 설정",
+            width=80,
+            height=28,
+            command=self._on_settings_click,
+            font=ctk.CTkFont(size=12)
+        )
+        settings_btn.pack(pady=(0, 2))
+        
+        # 이미지 카운터 (설정 버튼 아래)
+        self.counter_label = ctk.CTkLabel(
+            right_frame,
+            text="0/20",
+            font=ctk.CTkFont(size=10),
+            text_color=("gray50", "gray60")
+        )
+        self.counter_label.pack()
+        
+        # 중앙 상태 레이블 (숨김 처리, 필요시 표시)
         self.status_label = ctk.CTkLabel(
-            instruction_container,
-            text="준비됨",
+            control_frame,
+            text="",
             font=ctk.CTkFont(size=10),
             text_color=("gray30", "gray70")
         )
-        self.status_label.pack()
     
     def _create_thumbnail_grid(self):
         """썸네일 그리드 생성"""
+        # 썸네일 영역에 다른 배경색 적용 가능
         self.grid_frame = ctk.CTkScrollableFrame(self.root)
         self.grid_frame.pack(fill="both", expand=True, padx=10, pady=(0, 10))
         
-        # 그리드 컬럼 설정
-        for i in range(6):  # 6 컬럼
-            self.grid_frame.grid_columnconfigure(i, weight=1)
+        # 초기에는 컬럼 설정하지 않음 (동적으로 설정됨)
     
     def bind_shortcuts(self):
         """키보드 단축키 바인딩"""
@@ -125,12 +128,24 @@ class MainWindow:
     
     def update_thumbnail_grid(self, image_files: list, thumbnail_size: int = 100):
         """썸네일 그리드 업데이트"""
+        # 현재 이미지와 썸네일 크기 저장
+        self.current_images = image_files
+        self.current_thumbnail_size = thumbnail_size
+        
         # 기존 썸네일 제거
         for widget in self.grid_frame.winfo_children():
             widget.destroy()
         self.thumbnails.clear()
         
-        columns = 6
+        # 창 너비에 따른 동적 컬럼 수 계산
+        columns = self._calculate_columns(thumbnail_size)
+        self.current_columns = columns  # 현재 컬럼 수 저장
+        
+        # 그리드 컬럼 재설정 (기존 설정 모두 제거 후 재설정)
+        for i in range(20):  # 충분히 큰 수로 기존 컬럼 설정 제거
+            self.grid_frame.grid_columnconfigure(i, weight=0)
+        for i in range(columns):
+            self.grid_frame.grid_columnconfigure(i, weight=1)
         
         for idx, img_path in enumerate(image_files):
             if not img_path.exists():
@@ -181,11 +196,11 @@ class MainWindow:
                 # 툴팁 (호버 이벤트)
                 img_label.bind(
                     "<Enter>", 
-                    lambda e, path=img_path: self.update_status(f"클릭하여 복사: {path}")
+                    lambda e, path=img_path: self.update_status(f"📋 {path.name}")
                 )
                 img_label.bind(
                     "<Leave>", 
-                    lambda e: self.update_status("준비됨")
+                    lambda e: self.update_status("")
                 )
                 
             except Exception as e:
@@ -194,6 +209,10 @@ class MainWindow:
     def update_status(self, message: str):
         """상태 메시지 업데이트"""
         self.status_label.configure(text=message, text_color=("gray10", "gray90"))
+    
+    def update_counter(self, current: int, max_count: int):
+        """이미지 카운터 업데이트"""
+        self.counter_label.configure(text=f"{current}/{max_count}")
     
     def update_status_error(self, message: str, duration: int = 3000):
         """에러 상태 메시지 업데이트 (빨간색)
@@ -204,8 +223,8 @@ class MainWindow:
         """
         self.status_label.configure(text=message, text_color="red")
         
-        # 일정 시간 후 원래 상태로 복구
-        self.root.after(duration, lambda: self.update_status("준비됨"))
+        # 일정 시간 후 비우기
+        self.root.after(duration, lambda: self.update_status(""))
     
     def show_error(self, title: str, message: str):
         """에러 메시지 표시"""
@@ -240,6 +259,62 @@ class MainWindow:
         """설정 버튼 클릭 처리"""
         if self.on_settings_callback:
             self.on_settings_callback()
+    
+    def _calculate_columns(self, thumbnail_size: int) -> int:
+        """창 너비에 따른 최적 컬럼 수 계산"""
+        # grid_frame의 실제 너비 가져오기
+        available_width = self.grid_frame.winfo_width()
+        if available_width <= 1:  # 아직 렌더링되지 않은 경우
+            available_width = self.root.winfo_width() - 40  # 패딩 고려
+        
+        # 스크롤바 너비와 여백 고려
+        available_width -= 30  # 스크롤바 + 여백
+        
+        # 각 썸네일이 차지하는 실제 너비 (썸네일 + 패딩 + 테두리 + 레이블)
+        thumb_total_width = thumbnail_size + 20  # 패딩과 여백 포함
+        
+        # 최소 2개, 최대 10개 컬럼
+        columns = max(2, min(10, available_width // thumb_total_width))
+        
+        return columns
+    
+    def bind_resize_event(self):
+        """창 크기 변경 이벤트 바인딩"""
+        # 디바운싱을 위한 타이머
+        self.resize_timer = None
+        
+        def on_resize(event):
+            # root 윈도우의 이벤트만 처리 (자식 위젯 이벤트 무시)
+            if event.widget != self.root:
+                return
+            
+            # 너비가 실제로 변경된 경우만 처리
+            current_width = event.width
+            if abs(current_width - self.last_width) < 50:  # 50픽셀 미만 변경은 무시
+                return
+            
+            self.last_width = current_width
+            
+            # 이전 타이머 취소
+            if self.resize_timer:
+                self.root.after_cancel(self.resize_timer)
+            
+            # 500ms 후에 리사이즈 처리 (디바운싱 시간 증가)
+            self.resize_timer = self.root.after(500, self._handle_resize)
+        
+        # Configure 이벤트는 창 크기가 변경될 때 발생
+        self.root.bind('<Configure>', on_resize)
+    
+    def _handle_resize(self):
+        """창 크기 변경 처리"""
+        if self.current_images:
+            # 새로운 컬럼 수 계산
+            new_columns = self._calculate_columns(self.current_thumbnail_size)
+            
+            # 컬럼 수가 변경된 경우에만 그리드 업데이트
+            if new_columns != self.current_columns:
+                self.current_columns = new_columns
+                self.update_thumbnail_grid(self.current_images, self.current_thumbnail_size)
     
     def _on_thumbnail_click(self, img_path: Path):
         """썸네일 클릭 처리"""

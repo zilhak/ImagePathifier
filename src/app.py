@@ -87,9 +87,7 @@ class ImagePathifierApp:
                     # 경로를 클립보드에 복사
                     path_str = str(filepath.absolute())
                     if self.clipboard_manager.copy_text_to_clipboard(path_str):
-                        self.main_window.update_status(
-                            f"저장됨: {filepath.name} - 경로가 클립보드에 복사되었습니다!"
-                        )
+                        self.main_window.update_status(f"✓ {filepath.name}")
                         self.update_ui()
                     else:
                         self.main_window.show_error(
@@ -113,7 +111,7 @@ class ImagePathifierApp:
         """이미지 경로를 클립보드에 복사"""
         path_str = str(img_path.absolute())
         if self.clipboard_manager.copy_text_to_clipboard(path_str):
-            self.main_window.update_status(f"복사됨: {path_str}")
+            self.main_window.update_status(f"✓ {img_path.name}")
         else:
             self.main_window.show_error(
                 "클립보드 오류", 
@@ -181,14 +179,10 @@ class ImagePathifierApp:
             self.config_manager.get('thumbnail_size', 100)
         )
         
-        # 상태 업데이트
-        save_dir = self.image_manager.save_dir
+        # 카운터 업데이트
         max_images = self.image_manager.max_images
         current_count = len(images)
-        
-        self.main_window.update_status(
-            f"이미지: {current_count}/{max_images} | 저장 위치: {save_dir}"
-        )
+        self.main_window.update_counter(current_count, max_images)
     
     def run(self):
         """애플리케이션 실행"""
