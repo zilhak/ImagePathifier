@@ -1,0 +1,51 @@
+[package]
+name = "image-pathifier"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# GUI framework (egui + eframe)
+eframe = "0.29"
+egui = "0.29"
+egui_extras = { version = "0.29", features = ["image"] }
+
+# 클립보드 관리 (이미지 지원)
+arboard = { version = "3.4", features = ["image-data"] }
+
+# 이미지 처리
+image = { version = "0.25", features = ["png", "jpeg"] }
+
+# 설정 관리
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+confy = "0.6"
+
+# 디렉토리 관리
+dirs = "5.0"
+
+# 파일 시스템
+walkdir = "2.5"
+
+# 에러 처리
+anyhow = "1.0"
+
+# 날짜/시간
+chrono = "0.4"
+
+# 로깅
+env_logger = "0.11"
+log = "0.4"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true  # 심볼 제거로 바이너리 크기 감소
+
+# Windows 실행 파일에서 콘솔 창 숨기기
+[target.'cfg(windows)'.build-dependencies]
+winres = "0.1"
+
+[[bin]]
+name = "image-pathifier"
+path = "src/main.rs"
