@@ -50,3 +50,8 @@ htmlcov/
 # Backup files
 *_old.py
 *.bak
+
+# Rust
+/target
+Cargo.lock
+rust-src/
