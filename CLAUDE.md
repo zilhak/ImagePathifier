@@ -1,7 +1,9 @@
-# ImagePathifier - 완전한 프로젝트 명세서
+# ImagePathifier - Rust Edition 프로젝트 명세서
 
 ## 프로젝트 개요
 클립보드의 이미지를 파일 경로로 변환하는 크로스 플랫폼 데스크톱 애플리케이션. Claude CLI 및 기타 커맨드라인 도구와의 원활한 통합을 위해 특별히 설계됨.
+
+**Python에서 Rust로 전환**: 단일 실행 파일, 빠른 시작, 낮은 메모리 사용량
 
 ## 핵심 기능
 
@@ -17,250 +19,280 @@
 ## 기술 아키텍처
 
 ### 기술 스택
-- **언어**: Python 3.7+
-- **GUI 프레임워크**: customtkinter (모던 tkinter 래퍼)
-- **이미지 처리**: Pillow (PIL)
-- **클립보드 관리**: pyperclip (텍스트), ImageGrab (이미지)
+- **언어**: Rust 2021 Edition
+- **GUI 프레임워크**: egui (즉시 모드 GUI)
+- **이미지 처리**: image crate
+- **클립보드 관리**: arboard (크로스 플랫폼)
+- **설정 관리**: confy (자동 직렬화)
 - **플랫폼 지원**: Windows, macOS, Linux
 
 ### 프로젝트 구조
 ```
 ImagePathifier/
-├── ImagePathifier.py          # 진입점
+├── Cargo.toml              # Rust 프로젝트 설정
 ├── src/
-│   ├── app.py                # 메인 애플리케이션 클래스
-│   ├── config.py             # 설정 관리
-│   ├── image_manager.py     # 이미지 파일 작업
-│   ├── ui/
-│   │   ├── main_window.py   # 메인 윈도우 UI
-│   │   └── settings_window.py # 설정 다이얼로그
-│   └── utils/
-│       └── clipboard.py     # 클립보드 작업
-├── saved_images/             # 기본 이미지 저장소
-├── settings.json            # 사용자 설정
-└── requirements.txt         # Python 의존성
+│   ├── main.rs            # 진입점, 폰트 설정
+│   ├── app.rs             # 메인 애플리케이션 로직
+│   ├── config.rs          # 설정 관리
+│   ├── image_manager.rs   # 이미지 파일 작업
+│   ├── clipboard.rs       # 클립보드 작업
+│   └── ui/
+│       ├── mod.rs         # UI 모듈
+│       ├── settings_window.rs  # 설정 다이얼로그
+│       └── thumbnail_grid.rs   # 썸네일 그리드
+├── build.bat              # Windows 빌드 스크립트
+├── build.sh               # macOS/Linux 빌드 스크립트
+└── saved_images/          # 기본 이미지 저장소
 ```
 
-## 상세 구현 요구사항
+## 상세 구현 설명
 
-### 1. 메인 애플리케이션 (`src/app.py`)
-```python
-class ImagePathifierApp:
-    """
-    핵심 애플리케이션 오케스트레이터:
-    - 모든 관리자 초기화 (config, image, clipboard)
-    - GUI 윈도우 설정
-    - 붙여넣기 이벤트 처리
-    - 설정 관리
-    """
+### 1. 메인 애플리케이션 (`src/app.rs`)
+
+```rust
+pub struct ImagePathifierApp {
+    config: Config,
+    clipboard: Arc<Mutex<ClipboardManager>>,
+    image_manager: ImageManager,
+    status_message: String,
+    status_color: egui::Color32,
+    image_list: Vec<PathBuf>,
+    thumbnails: Vec<(PathBuf, egui::TextureHandle)>,
+    show_settings: bool,
+    temp_config: Config,
+    clicked_path: Option<PathBuf>,
+}
 ```
 
-주요 책임:
-- `settings.json`에서 설정 초기화
-- 메인 윈도우 생성 및 관리
+**주요 책임**:
+- egui 컨텍스트에서 설정 초기화
+- 메인 윈도우 렌더링 및 이벤트 처리
 - 클립보드 붙여넣기 이벤트 처리 (키보드 단축키와 버튼 클릭 모두)
 - 클립보드 관리자와 이미지 관리자 간 조정
 - 설정 변경 동적 적용
+- 썸네일 그리드 업데이트
 
-### 2. 설정 관리 (`src/config.py`)
-```python
-class ConfigManager:
-    """
-    영구 설정 관리:
-    - save_directory: 이미지 저장 위치 (기본값: ./saved_images)
-    - max_images: 보관할 최대 이미지 수 (기본값: 20)
-    - theme: UI 테마 (system/light/dark)
-    - thumbnail_size: 이미지 미리보기 표시 크기
-    """
+**Rust 특징**:
+- `Arc<Mutex<ClipboardManager>>`: 스레드 안전한 클립보드 접근
+- `clicked_path`: borrowing 규칙 준수를 위한 지연 처리
+- `egui::TextureHandle`: GPU 텍스처 관리
+
+### 2. 설정 관리 (`src/config.rs`)
+
+```rust
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Config {
+    pub save_directory: PathBuf,
+    pub max_images: usize,
+    pub theme: Theme,
+    pub thumbnail_size: u32,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+pub enum Theme {
+    System,
+    Light,
+    Dark,
+}
 ```
 
-설정은 JSON 형식으로 저장되며, 첫 실행 시 기본값 사용.
+**설정 저장**:
+- `confy` crate 사용으로 자동 직렬화/역직렬화
+- 플랫폼별 설정 경로 자동 관리
+- Windows: `%APPDATA%\image-pathifier\config.toml`
+- macOS: `~/Library/Application Support/image-pathifier/config.toml`
+- Linux: `~/.config/image-pathifier/config.toml`
 
-### 3. 이미지 관리 (`src/image_manager.py`)
-```python
-class ImageManager:
-    """
-    파일 작업 처리:
-    - 순차적 명명 (img_0001.png, img_0002.png 등)
-    - 디렉토리 관리
-    - 형식 변환과 함께 이미지 저장
-    - 기존 이미지 추적
-    - max_images 초과 시 정리
-    """
+### 3. 이미지 관리 (`src/image_manager.rs`)
+
+```rust
+pub struct ImageManager {
+    save_directory: PathBuf,
+    max_images: usize,
+}
 ```
 
-중요: 기존 번호가 매겨진 파일을 올바르게 처리하고 다음 사용 가능한 번호를 찾아야 함.
+**파일 작업**:
+- 순차적 명명 (img_0001.png, img_0002.png 등)
+- 디렉토리 자동 생성
+- PNG 형식으로 이미지 저장
+- 기존 이미지 추적 (최신순 정렬)
+- max_images 초과 시 오래된 이미지 자동 정리
+- `walkdir` crate로 효율적인 파일 시스템 탐색
 
-### 4. 클립보드 작업 (`src/utils/clipboard.py`)
-```python
-class ClipboardManager:
-    """
-    플랫폼별 클립보드 처리:
-    - 클립보드의 이미지 감지
-    - 이미지 데이터 추출
-    - 텍스트(파일 경로) 클립보드에 복사
-    """
+**중요**: `get_next_image_number()`는 기존 번호가 매겨진 파일을 올바르게 처리하고 다음 사용 가능한 번호를 찾습니다.
+
+### 4. 클립보드 작업 (`src/clipboard.rs`)
+
+```rust
+pub struct ClipboardManager {
+    clipboard: Clipboard,
+}
 ```
 
-**중요한 macOS 고려사항**: macOS에서는 키보드 단축키가 `Control-V` 외에 `Command-V`도 사용해야 함. 앱은 둘 다 바인딩해야 함:
-- Windows/Linux: `Control-V`, `Control-v`
-- macOS: `Command-V`, `Command-v`, `Control-V`, `Control-v`
+**크로스 플랫폼 처리**:
+- `arboard` crate로 플랫폼별 클립보드 API 추상화
+- 이미지 데이터 감지 및 추출
+- RGBA 형식으로 이미지 변환
+- 텍스트 클립보드에 경로 복사
 
-적절한 키 바인딩을 위해 플랫폼 감지 필요.
+**macOS 고려사항**:
+- 클립보드 접근은 `arboard`가 자동 처리
+- 권한 문제 시 시스템 환경설정에서 권한 부여 필요
 
-### 5. 메인 윈도우 UI (`src/ui/main_window.py`)
+### 5. 메인 진입점 (`src/main.rs`)
 
-레이아웃 구조:
+**한글 폰트 지원**:
+```rust
+fn setup_fonts(ctx: &egui::Context) {
+    // Windows: 맑은 고딕, 굴림, 바탕
+    // macOS: AppleSDGothicNeo
+    // Linux: Noto Sans CJK
+}
+```
+
+**플랫폼별 폰트 로드**:
+- 시스템 폰트 디렉토리에서 자동 감지
+- egui의 기본 폰트 앞에 한글 폰트 추가
+- 한글 우선, 영문은 기본 폰트 사용
+
+### 6. UI 구성
+
+**메인 윈도우 레이아웃**:
 ```
 ┌─────────────────────────────────────┐
-│ Image Pathifier          [⚙ 설정]    │ <- 제목 바와 설정 버튼
+│ [📋 붙여넣기]  Ctrl+V    0/20  [⚙]  │ <- 상단 패널
+│ 상태: 준비됨                         │
 ├─────────────────────────────────────┤
-│   [📋 클립보드에서 붙여넣기]           │ <- 중앙 정렬된 붙여넣기 버튼
-│   단축키: Cmd+V 또는 Ctrl+V          │ <- 도움말 텍스트
-│   상태: 준비됨                       │ <- 상태 메시지
-├─────────────────────────────────────┤
-│ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐   │
-│ │     │ │     │ │     │ │     │   │ <- 썸네일 그리드
-│ │ img │ │ img │ │ img │ │ img │   │    (6열)
-│ │     │ │     │ │     │ │     │   │
-│ └─────┘ └─────┘ └─────┘ └─────┘   │
-│  0005    0004    0003    0002      │ <- 이미지 번호
+│ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐    │
+│ │     │ │     │ │     │ │     │    │ <- 썸네일 그리드
+│ │ img │ │ img │ │ img │ │ img │    │    (동적 컬럼)
+│ │     │ │     │ │     │ │     │    │
+│ └─────┘ └─────┘ └─────┘ └─────┘    │
+│ [최신] img_0005.png                 │
 └─────────────────────────────────────┘
 ```
 
-주요 UI 요구사항:
-- customtkinter를 통한 다크 테마 지원
-- 최근 이미지를 보여주는 스크롤 가능한 썸네일 그리드
-- 썸네일 클릭으로 경로 복사
-- 상태에 대한 시각적 피드백 (성공/오류 메시지)
-- 반응형 레이아웃 (최소 600x400, 기본 800x600)
-
-### 6. 설정 윈도우 (`src/ui/settings_window.py`)
-
-모달 다이얼로그 포함 요소:
-- 저장 위치를 위한 디렉토리 선택기
-- 최대 이미지 수 슬라이더 (1-100)
-- 테마 선택기 (System/Light/Dark)
-- 썸네일 크기 슬라이더 (50-200px)
+**설정 다이얼로그**:
+- 모달 윈도우
+- 디렉토리 경로 입력
+- 슬라이더: 최대 이미지 수 (1-100)
+- 슬라이더: 썸네일 크기 (50-200px)
+- 테마 선택: System/Light/Dark
 - 저장/취소 버튼
 
-**중요**: 설정 창은 클릭 시 즉시 나타나야 하며, 다음을 사용:
-- `window.lift()` 앞으로 가져오기
-- `window.attributes('-topmost', True)` 일시적으로
-- `window.focus_force()` 즉시 포커스
-- 중복 창 방지
-
-## 플랫폼별 고려사항
-
-### macOS
-1. **클립보드 접근**: 더 나은 클립보드 처리를 위해 pyobjc가 필요할 수 있음
-2. **키 바인딩**: Command 키 지원 필수 (`<Command-v>`)
-3. **Tkinter 지원**: Tk 지원으로 빌드된 Python 필요 (tcl-tk와 함께 pyenv 사용)
+## 크로스 플랫폼 고려사항
 
 ### Windows
-1. **파일 경로**: 백슬래시 올바르게 처리
-2. **클립보드**: ImageGrab이 네이티브로 작동
-3. **키 바인딩**: Control 키만 사용
+- **폰트**: 맑은 고딕 자동 로드
+- **경로**: 백슬래시 자동 처리
+- **클립보드**: 네이티브 API 사용
+- **키 바인딩**: Ctrl+V
+- **콘솔 숨기기**: `#![windows_subsystem = "windows"]`
 
-### 크로스 플랫폼
-- OS 감지를 위해 `platform.system()` 사용
-- 플랫폼에 따라 클립보드 작업 추상화
-- 다른 플랫폼에서 키 바인딩이 오류를 일으키지 않도록 테스트
+### macOS
+- **폰트**: AppleSDGothicNeo 자동 로드
+- **키 바인딩**: Cmd+V
+- **권한**: 클립보드 접근 권한 필요 시 시스템 설정에서 부여
+
+### Linux
+- **폰트**: Noto Sans CJK 자동 로드
+- **X11/Wayland**: arboard가 자동 처리
+- **의존성**: 시스템 라이브러리 필요 시 설치
+  ```bash
+  sudo apt install libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev
+  ```
+
+## 빌드 및 배포
+
+### 개발 빌드
+```bash
+cargo build
+cargo run
+```
+
+### 릴리스 빌드
+```bash
+cargo build --release
+```
+
+**최적화 옵션**:
+```toml
+[profile.release]
+opt-level = 3        # 최대 최적화
+lto = true          # Link Time Optimization
+codegen-units = 1   # 단일 코드 생성 유닛
+strip = true        # 심볼 제거
+```
+
+**바이너리 크기**: 약 10MB (최적화 후)
+
+### 빌드 스크립트
+- **Windows**: `build.bat` - 빌드 후 시작 프로그램 등록 제안
+- **macOS/Linux**: `build.sh` - 빌드 후 LaunchAgent/autostart 안내
 
 ## 사용자 경험 흐름
 
 1. **시작**
-   - 설정 로드
-   - 필요시 저장 디렉토리 생성
-   - 그리드에 기존 이미지 표시
+   - 설정 로드 (confy 자동 처리)
+   - 저장 디렉토리 생성
+   - 기존 이미지 로드 및 썸네일 생성
+   - 한글 폰트 로드
    - "준비됨" 상태 표시
 
 2. **붙여넣기 작업**
-   - 사용자가 Cmd/Ctrl+V를 누르거나 붙여넣기 버튼 클릭
-   - 앱이 클립보드에서 이미지 확인
-   - 이미지가 있으면:
+   - 사용자가 Cmd/Ctrl+V 또는 버튼 클릭
+   - 클립보드에서 이미지 확인
+   - 이미지 있으면:
      - `saved_images/img_XXXX.png`로 저장
-     - 전체 절대 경로를 클립보드에 복사
+     - 절대 경로를 클립보드에 복사
      - 썸네일 그리드 업데이트
-     - 성공 메시지 표시
-   - 이미지가 없으면:
-     - 빨간색으로 오류 메시지 표시
-     - 팝업 다이얼로그 없음
+     - 성공 메시지 표시 (초록색)
+   - 이미지 없으면:
+     - 에러 메시지 표시 (빨간색)
 
-3. **설정 변경**
+3. **썸네일 클릭**
+   - 썸네일 클릭 시 해당 경로 복사
+   - 상태 메시지 업데이트
+
+4. **설정 변경**
    - 모달 설정 창 열기
-   - 저장 시 즉시 변경 사항 적용
+   - 저장 시 즉시 적용
    - 테마 변경 시 UI 업데이트
    - 디렉토리 변경 시 이미지 다시 로드
 
-## 오류 처리
+## 에러 처리
 
-- **클립보드에 이미지 없음**: 일시적인 빨간색 상태 메시지 표시
-- **저장 디렉토리 문제**: 자동으로 디렉토리 생성
-- **권한 오류**: 세부 정보와 함께 오류 다이얼로그 표시
-- **잘못된 설정**: 기본값 사용하고 경고 로그
+- **클립보드에 이미지 없음**: 빨간색 상태 메시지
+- **저장 디렉토리 문제**: 자동으로 디렉토리 생성, 실패 시 에러 메시지
+- **권한 오류**: 에러 로그 출력
+- **잘못된 설정**: 기본값 사용
 
-## 테스트 체크리스트
+## 성능 특징
 
-- [ ] macOS에서 Cmd+V 작동
-- [ ] Windows/Linux에서 Ctrl+V 작동
-- [ ] 모든 플랫폼에서 붙여넣기 버튼 작동
-- [ ] 스크린샷이 올바르게 붙여넣어짐
-- [ ] 파일 경로가 절대 경로임
-- [ ] 설정이 세션 간 유지됨
-- [ ] 테마 변경이 즉시 적용됨
-- [ ] 썸네일 그리드가 올바르게 업데이트됨
-- [ ] 클릭하여 경로 복사 작동
-- [ ] 설정 창이 즉시 나타남
-- [ ] 중복 설정 창 없음
+- **시작 시간**: <1초
+- **메모리 사용**: ~20-40MB
+- **이미지 저장**: 즉각 (수십 ms)
+- **썸네일 로드**: 요청 시 (lazy loading)
+- **UI 반응**: 60 FPS 유지
 
-## 빌드 및 배포
+## Rust의 장점
 
-### 개발 설정
-```bash
-# 가상 환경 생성
-python -m venv venv
+1. **메모리 안전성**: Borrowing checker로 메모리 버그 방지
+2. **스레드 안전성**: Arc<Mutex<>> 패턴으로 안전한 동시성
+3. **제로 비용 추상화**: 고수준 코드에도 C++ 수준 성능
+4. **패턴 매칭**: Result/Option으로 명확한 에러 처리
+5. **크로스 컴파일**: 단일 코드베이스로 모든 플랫폼 지원
 
-# 활성화
-source venv/bin/activate  # Mac/Linux
-venv\Scripts\activate     # Windows
+## 향후 개선 사항
 
-# 의존성 설치
-pip install -r requirements.txt
+- [ ] 이미지 압축 옵션
+- [ ] 다양한 이미지 포맷 지원 (JPEG, WebP)
+- [ ] 클라우드 스토리지 연동
+- [ ] 이미지 편집 기능 (크롭, 리사이즈)
+- [ ] 핫키 커스터마이징
+- [ ] 다국어 지원 확대
 
-# 실행
-python ImagePathifier.py
-```
+## 라이선스
 
-### requirements 파일
-```
-Pillow>=10.0.0
-pyperclip>=1.8.2
-customtkinter>=5.2.0
-```
-
-### macOS용 옵션
-```
-pyobjc-framework-Cocoa  # 더 나은 클립보드 지원
-```
-
-## 핵심 구현 참고사항
-
-1. **순차 번호 매기기**: 항상 다음 사용 가능한 번호 찾기, 연속적인 순서 가정하지 않기
-2. **클립보드 루프 방지**: 경로 복사 시 붙여넣기 이벤트 트리거하지 않기
-3. **UI 반응성**: 적절한 이벤트 처리 사용, 블로킹 작업 피하기
-4. **리소스 관리**: max_images 초과 시 오래된 이미지 정리
-5. **경로 처리**: 호환성을 위해 항상 절대 경로 사용
-6. **상태 피드백**: 빠르고 비침입적인 상태 메시지
-7. **설정 검증**: 적용 전 모든 설정 검증
-
-## 성공 기준
-
-애플리케이션이 성공적이려면:
-1. 사용자가 단일 키보드 단축키로 이미지를 붙여넣고 경로를 얻을 수 있어야 함
-2. Windows와 macOS에서 동일하게 작동해야 함
-3. UI가 방해되지 않으면서도 명확한 피드백을 제공해야 함
-4. 설정 변경이 즉각적이고 영구적이어야 함
-5. 앱이 CLI 워크플로우와 원활하게 통합되어야 함
-
-이 명세서를 통해 누구든지 동일한 기능과 사용자 경험을 가진 ImagePathifier 애플리케이션을 재현할 수 있어야 합니다.
+MIT
