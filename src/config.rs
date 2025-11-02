@@ -19,9 +19,14 @@ pub enum Theme {
 
 impl Default for Config {
     fn default() -> Self {
-        let home_dir = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+        // exe가 있는 폴더/saved_images를 기본값으로
+        let exe_dir = std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+            .unwrap_or_else(|| PathBuf::from("."));
+
         Self {
-            save_directory: home_dir.join("saved_images"),
+            save_directory: exe_dir.join("saved_images"),
             max_images: 20,
             theme: Theme::Dark,
             thumbnail_size: 100,
@@ -30,14 +35,38 @@ impl Default for Config {
 }
 
 impl Config {
-    /// 설정 로드
-    pub fn load() -> Self {
-        confy::load("image-pathifier", "config").unwrap_or_default()
+    /// exe 폴더의 settings.json 경로 가져오기
+    fn get_config_path() -> PathBuf {
+        let exe_dir = std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+            .unwrap_or_else(|| PathBuf::from("."));
+
+        exe_dir.join("settings.json")
     }
 
-    /// 설정 저장
+    /// 설정 로드 (exe폴더/settings.json)
+    pub fn load() -> Self {
+        let config_path = Self::get_config_path();
+
+        if config_path.exists() {
+            // 파일이 있으면 로드
+            if let Ok(contents) = std::fs::read_to_string(&config_path) {
+                if let Ok(config) = serde_json::from_str(&contents) {
+                    return config;
+                }
+            }
+        }
+
+        // 파일이 없거나 파싱 실패 시 기본값
+        Self::default()
+    }
+
+    /// 설정 저장 (exe폴더/settings.json)
     pub fn save(&self) -> anyhow::Result<()> {
-        confy::store("image-pathifier", "config", self)?;
+        let config_path = Self::get_config_path();
+        let json = serde_json::to_string_pretty(self)?;
+        std::fs::write(config_path, json)?;
         Ok(())
     }
 

@@ -17,18 +17,20 @@ impl ClipboardManager {
     pub fn get_image(&mut self) -> anyhow::Result<Option<DynamicImage>> {
         match self.clipboard.get_image() {
             Ok(img_data) => {
+                log::info!("클립보드 이미지 감지: {}x{}", img_data.width, img_data.height);
                 // arboard ImageData를 image crate DynamicImage로 변환
                 let img = self.convert_to_dynamic_image(img_data)?;
                 Ok(Some(img))
             }
-            Err(arboard::Error::ContentNotAvailable) => Ok(None),
-            Err(e) => Err(e.into()),
+            Err(arboard::Error::ContentNotAvailable) => {
+                log::warn!("클립보드에 이미지 없음 (ContentNotAvailable)");
+                Ok(None)
+            }
+            Err(e) => {
+                log::error!("클립보드 읽기 오류: {:?}", e);
+                Err(e.into())
+            }
         }
-    }
-
-    /// 클립보드에 이미지가 있는지 확인
-    pub fn has_image(&mut self) -> bool {
-        self.clipboard.get_image().is_ok()
     }
 
     /// 텍스트를 클립보드에 복사

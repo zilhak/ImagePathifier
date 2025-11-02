@@ -12,7 +12,11 @@ mod ui;
 use eframe::egui;
 
 fn main() -> Result<(), eframe::Error> {
-    env_logger::init(); // 로깅 초기화
+    // 로깅 초기화 (기본 레벨: info)
+    env_logger::Builder::from_default_env()
+        .filter_level(log::LevelFilter::Info)
+        .filter_module("egui_winit::clipboard", log::LevelFilter::Off) // egui_winit 클립보드 에러 숨기기
+        .init();
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
