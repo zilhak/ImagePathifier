@@ -70,8 +70,15 @@ impl ImagePathifierApp {
                 // 이미지 저장
                 match self.image_manager.save_image(&img) {
                     Ok(path) => {
+                        // 경로를 문자열로 변환
+                        let mut path_str = path.to_string_lossy().to_string();
+
+                        // WSL 모드가 활성화되어 있으면 경로 변환
+                        if self.config.wsl_mode {
+                            path_str = Self::convert_to_wsl_path(&path_str);
+                        }
+
                         // 경로를 클립보드에 복사
-                        let path_str = path.to_string_lossy().to_string();
                         if let Err(e) = clipboard_guard.copy_text(&path_str) {
                             self.set_status_error(format!("클립보드 복사 실패: {}", e));
                         } else {
@@ -101,7 +108,14 @@ impl ImagePathifierApp {
         let clipboard = Arc::clone(&self.clipboard);
         let mut clipboard_guard = clipboard.lock().unwrap();
 
-        let path_str = path.to_string_lossy().to_string();
+        // 경로를 문자열로 변환
+        let mut path_str = path.to_string_lossy().to_string();
+
+        // WSL 모드가 활성화되어 있으면 경로 변환
+        if self.config.wsl_mode {
+            path_str = Self::convert_to_wsl_path(&path_str);
+        }
+
         if let Err(e) = clipboard_guard.copy_text(&path_str) {
             self.set_status_error(format!("클립보드 복사 실패: {}", e));
         } else {
@@ -142,6 +156,32 @@ impl ImagePathifierApp {
     fn set_status_error(&mut self, message: String) {
         self.status_message = message;
         self.status_color = egui::Color32::RED;
+    }
+
+    /// Windows 경로를 WSL 경로로 변환
+    /// 예: E:\workspace\img.png -> /mnt/e/workspace/img.png
+    fn convert_to_wsl_path(windows_path: &str) -> String {
+        let mut path = windows_path.to_string();
+
+        // Windows UNC 경로 처리 (\\?\E:\... 형식)
+        if path.starts_with(r"\\?\") {
+            path = path[4..].to_string();
+        }
+
+        // 백슬래시를 슬래시로 변환
+        path = path.replace('\\', "/");
+
+        // 드라이브 문자 추출 (C:, E: 등)
+        if let Some(colon_pos) = path.find(':') {
+            if colon_pos > 0 && colon_pos <= 2 {
+                let drive = &path[..colon_pos].to_lowercase();
+                let rest = &path[colon_pos + 1..];
+                return format!("/mnt/{}{}", drive, rest);
+            }
+        }
+
+        // 드라이브 문자가 없으면 그대로 반환
+        path
     }
 
 }
@@ -185,6 +225,7 @@ impl eframe::App for ImagePathifierApp {
                 self.status_color,
                 self.image_list.len(),
                 self.config.max_images,
+                &mut self.config.wsl_mode,
                 &mut on_paste,
                 &mut on_settings,
             );

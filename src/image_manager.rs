@@ -34,8 +34,8 @@ impl ImageManager {
         // 최대 이미지 수 초과 시 오래된 이미지 삭제
         self.cleanup_old_images()?;
 
-        // 절대 경로 반환
-        Ok(filepath.canonicalize()?)
+        // 경로 반환 (canonicalize 사용하지 않음 - Windows에서 \\?\ 접두사 붙는 문제 방지)
+        Ok(filepath)
     }
 
     /// 다음 사용 가능한 이미지 번호 찾기

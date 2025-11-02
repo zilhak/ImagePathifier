@@ -8,6 +8,7 @@ pub struct Config {
     pub max_images: usize,
     pub theme: Theme,
     pub thumbnail_size: u32,
+    pub wsl_mode: bool,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
@@ -30,6 +31,7 @@ impl Default for Config {
             max_images: 20,
             theme: Theme::Dark,
             thumbnail_size: 100,
+            wsl_mode: false,
         }
     }
 }

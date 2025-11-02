@@ -8,6 +8,7 @@ pub fn render(
     status_color: egui::Color32,
     image_count: usize,
     max_images: usize,
+    wsl_mode: &mut bool,
     on_paste: &mut bool,
     on_settings: &mut bool,
 ) {
@@ -33,6 +34,9 @@ pub fn render(
             if ui.button("⚙ 설정").clicked() {
                 *on_settings = true;
             }
+
+            // WSL 모드 체크박스
+            ui.checkbox(wsl_mode, "WSL 모드");
         });
     });
 
