@@ -8,7 +8,7 @@ pub fn render(
     status_color: egui::Color32,
     image_count: usize,
     max_images: usize,
-    wsl_mode: &mut bool,
+    _wsl_mode: &mut bool,
     on_paste: &mut bool,
     on_settings: &mut bool,
 ) {
@@ -20,7 +20,7 @@ pub fn render(
 
         // 단축키 안내
         let shortcut = if cfg!(target_os = "macos") {
-            "Cmd+V"
+            "Cmd+V / Ctrl+V"
         } else {
             "Ctrl+V"
         };
@@ -35,8 +35,9 @@ pub fn render(
                 *on_settings = true;
             }
 
-            // WSL 모드 체크박스
-            ui.checkbox(wsl_mode, "WSL 모드");
+            // WSL 모드 체크박스 (Windows에서만 표시)
+            #[cfg(target_os = "windows")]
+            ui.checkbox(_wsl_mode, "WSL 모드");
         });
     });
 

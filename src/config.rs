@@ -8,7 +8,10 @@ pub struct Config {
     pub max_images: usize,
     pub theme: Theme,
     pub thumbnail_size: u32,
+    #[cfg(target_os = "windows")]
     pub wsl_mode: bool,
+    #[cfg(target_os = "macos")]
+    pub show_macos_tip: bool,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
@@ -31,7 +34,10 @@ impl Default for Config {
             max_images: 20,
             theme: Theme::Dark,
             thumbnail_size: 100,
+            #[cfg(target_os = "windows")]
             wsl_mode: false,
+            #[cfg(target_os = "macos")]
+            show_macos_tip: true, // 기본값은 팁 표시
         }
     }
 }
@@ -84,7 +90,23 @@ impl Config {
 impl Theme {
     pub fn to_visuals(&self) -> egui::Visuals {
         match self {
-            Theme::Light => egui::Visuals::light(),
+            Theme::Light => {
+                let mut visuals = egui::Visuals::light();
+                // 배경색을 RGB(240, 240, 240)으로 변경
+                visuals.panel_fill = egui::Color32::from_rgb(240, 240, 240);
+                visuals.window_fill = egui::Color32::from_rgb(240, 240, 240);
+                visuals.extreme_bg_color = egui::Color32::from_rgb(230, 230, 230);
+
+                // 버튼 배경색을 더 어둡게
+                visuals.widgets.inactive.weak_bg_fill = egui::Color32::from_rgb(210, 210, 210);
+                visuals.widgets.inactive.bg_fill = egui::Color32::from_rgb(210, 210, 210);
+                visuals.widgets.hovered.weak_bg_fill = egui::Color32::from_rgb(190, 190, 190);
+                visuals.widgets.hovered.bg_fill = egui::Color32::from_rgb(190, 190, 190);
+                visuals.widgets.active.weak_bg_fill = egui::Color32::from_rgb(170, 170, 170);
+                visuals.widgets.active.bg_fill = egui::Color32::from_rgb(170, 170, 170);
+
+                visuals
+            }
             Theme::Dark => egui::Visuals::dark(),
             Theme::System => {
                 // 시스템 테마 감지 (dark를 기본값으로)

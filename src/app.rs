@@ -71,12 +71,18 @@ impl ImagePathifierApp {
                 match self.image_manager.save_image(&img) {
                     Ok(path) => {
                         // 경로를 문자열로 변환
-                        let mut path_str = path.to_string_lossy().to_string();
+                        let path_str = path.to_string_lossy().to_string();
 
-                        // WSL 모드가 활성화되어 있으면 경로 변환
-                        if self.config.wsl_mode {
-                            path_str = Self::convert_to_wsl_path(&path_str);
-                        }
+                        // WSL 모드가 활성화되어 있으면 경로 변환 (Windows만)
+                        #[cfg(target_os = "windows")]
+                        let path_str = if self.config.wsl_mode {
+                            Self::convert_to_wsl_path(&path_str)
+                        } else {
+                            path_str
+                        };
+
+                        #[cfg(not(target_os = "windows"))]
+                        let path_str = path_str;
 
                         // 경로를 클립보드에 복사
                         if let Err(e) = clipboard_guard.copy_text(&path_str) {
@@ -109,12 +115,18 @@ impl ImagePathifierApp {
         let mut clipboard_guard = clipboard.lock().unwrap();
 
         // 경로를 문자열로 변환
-        let mut path_str = path.to_string_lossy().to_string();
+        let path_str = path.to_string_lossy().to_string();
 
-        // WSL 모드가 활성화되어 있으면 경로 변환
-        if self.config.wsl_mode {
-            path_str = Self::convert_to_wsl_path(&path_str);
-        }
+        // WSL 모드가 활성화되어 있으면 경로 변환 (Windows만)
+        #[cfg(target_os = "windows")]
+        let path_str = if self.config.wsl_mode {
+            Self::convert_to_wsl_path(&path_str)
+        } else {
+            path_str
+        };
+
+        #[cfg(not(target_os = "windows"))]
+        let path_str = path_str;
 
         if let Err(e) = clipboard_guard.copy_text(&path_str) {
             self.set_status_error(format!("클립보드 복사 실패: {}", e));
@@ -158,8 +170,9 @@ impl ImagePathifierApp {
         self.status_color = egui::Color32::RED;
     }
 
-    /// Windows 경로를 WSL 경로로 변환
+    /// Windows 경로를 WSL 경로로 변환 (Windows에서만 컴파일됨)
     /// 예: E:\workspace\img.png -> /mnt/e/workspace/img.png
+    #[cfg(target_os = "windows")]
     fn convert_to_wsl_path(windows_path: &str) -> String {
         let mut path = windows_path.to_string();
 
@@ -219,16 +232,27 @@ impl eframe::App for ImagePathifierApp {
         let mut on_settings = false;
 
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
+            #[cfg(target_os = "windows")]
+            let mut wsl_mode = self.config.wsl_mode;
+
+            #[cfg(not(target_os = "windows"))]
+            let mut wsl_mode = false;
+
             crate::ui::top_panel::render(
                 ui,
                 &self.status_message,
                 self.status_color,
                 self.image_list.len(),
                 self.config.max_images,
-                &mut self.config.wsl_mode,
+                &mut wsl_mode,
                 &mut on_paste,
                 &mut on_settings,
             );
+
+            #[cfg(target_os = "windows")]
+            {
+                self.config.wsl_mode = wsl_mode;
+            }
         });
 
         // 상단 패널 이벤트 처리
@@ -283,6 +307,79 @@ impl eframe::App for ImagePathifierApp {
             if should_close {
                 self.show_settings = false;
             }
+        }
+
+        // macOS 팁 모달
+        #[cfg(target_os = "macos")]
+        if self.config.show_macos_tip {
+            egui::Window::new("💡 Tip")
+                .collapsible(false)
+                .resizable(false)
+                .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+                .show(ctx, |ui| {
+                    ui.set_width(450.0);
+                    ui.vertical_centered(|ui| {
+                        ui.add_space(10.0);
+                        ui.label(
+                            egui::RichText::new(
+                                "macOS 이용자를 위한 팁"
+                            )
+                            .size(16.0)
+                            .strong()
+                        );
+                        ui.add_space(5.0);
+                        ui.label(
+                            egui::RichText::new(
+                                "Claude Code 또는 Codex 사용자"
+                            )
+                            .size(14.0)
+                            .color(egui::Color32::GRAY)
+                        );
+                        ui.add_space(15.0);
+                    });
+
+                    ui.label(
+                        egui::RichText::new(
+                            "Claude Code나 Codex CLI에서 이미지를 직접 붙여넣을 수 있습니다."
+                        )
+                        .size(14.0)
+                    );
+
+                    ui.add_space(10.0);
+
+                    ui.horizontal(|ui| {
+                        ui.label("단축키:");
+                        ui.label(
+                            egui::RichText::new("Ctrl + V")
+                                .strong()
+                                .color(egui::Color32::from_rgb(100, 150, 255))
+                        );
+                        ui.label(
+                            egui::RichText::new("(Cmd + V가 아닙니다)")
+                                .italics()
+                                .color(egui::Color32::GRAY)
+                        );
+                    });
+
+                    ui.add_space(20.0);
+
+                    ui.horizontal(|ui| {
+                        if ui.button("확인").clicked() {
+                            self.config.show_macos_tip = false;
+                        }
+
+                        ui.add_space(10.0);
+
+                        if ui.button("더이상 보지 않기").clicked() {
+                            self.config.show_macos_tip = false;
+                            if let Err(e) = self.config.save() {
+                                self.set_status_error(format!("설정 저장 실패: {}", e));
+                            }
+                        }
+                    });
+
+                    ui.add_space(5.0);
+                });
         }
 
         // 클릭된 썸네일 처리
